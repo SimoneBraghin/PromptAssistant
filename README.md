@@ -2,6 +2,7 @@
 
 Um assistente interativo e dinâmico especializado em criar prompts otimizados para o Claude. Oferece um painel de configuração guiada e um chat livre para tirar dúvidas sobre engenharia de prompts.
 
+https://simonebraghin.github.io/PromptAssistant/
 ---
 
 ## O que ele faz
