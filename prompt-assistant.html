@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptCraft — Assistente de Prompts</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3e;
+    --accent: #7c5cfc;
+    --accent2: #fc5c7d;
+    --accent3: #5cfcb8;
+    --text: #e8e8f0;
+    --muted: #6a6a8a;
+    --glow: rgba(124, 92, 252, 0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* Noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  header {
+    padding: 2rem 2rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .logo-mark {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    flex-shrink: 0;
+    box-shadow: 0 0 20px var(--glow);
+  }
+
+  header h1 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+
+  header p {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .main {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+    min-height: 0;
+    height: calc(100vh - 81px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 1.5rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+    background: var(--surface);
+  }
+
+  .sidebar h2 {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.2rem;
+  }
+
+  .field-group { display: flex; flex-direction: column; gap: 0.5rem; }
+
+  label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  select, input[type="text"], textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    padding: 0.6rem 0.8rem;
+    width: 100%;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+    resize: none;
+  }
+
+  select:focus, input[type="text"]:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.12);
+  }
+
+  select option { background: var(--surface2); }
+
+  .chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .chip {
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-family: 'Syne', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    font-weight: 600;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+  }
+
+  .generate-btn {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0.85rem;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 20px rgba(124,92,252,0.3);
+  }
+
+  .generate-btn:hover { opacity: 0.9; box-shadow: 0 6px 28px rgba(124,92,252,0.45); }
+  .generate-btn:active { transform: scale(0.98); }
+  .generate-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* CHAT AREA */
+  .chat-area {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    scroll-behavior: smooth;
+  }
+
+  .message {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    animation: slideUp 0.25s ease forwards;
+    opacity: 0;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .message.user { align-items: flex-end; }
+  .message.assistant { align-items: flex-start; }
+
+  .msg-label {
+    font-size: 0.68rem;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .msg-bubble {
+    max-width: 85%;
+    padding: 1rem 1.2rem;
+    border-radius: 14px;
+    font-size: 0.875rem;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .message.user .msg-bubble {
+    background: linear-gradient(135deg, var(--accent), rgba(124,92,252,0.7));
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+
+  .message.assistant .msg-bubble {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-bottom-left-radius: 4px;
+  }
+
+  /* Prompt result box */
+  .prompt-result {
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 1rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: var(--text);
+    position: relative;
+    margin-top: 0.5rem;
+    box-shadow: 0 0 20px var(--glow);
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    background: var(--border);
+    border: none;
+    border-radius: 6px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .copy-btn:hover { background: var(--accent); color: white; }
+  .copy-btn.copied { background: var(--accent3); color: #0a0a0f; }
+
+  /* Input bar */
+  .input-bar {
+    border-top: 1px solid var(--border);
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: 0.8rem;
+    align-items: flex-end;
+    background: var(--surface);
+  }
+
+  .input-bar textarea {
+    flex: 1;
+    min-height: 44px;
+    max-height: 130px;
+    resize: none;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .send-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    width: 44px;
+    height: 44px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.15s, transform 0.1s;
+    flex-shrink: 0;
+  }
+
+  .send-btn:hover { opacity: 0.85; }
+  .send-btn:active { transform: scale(0.93); }
+  .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .send-btn svg { width: 18px; height: 18px; fill: white; }
+
+  /* Loading dots */
+  .loading-bubble {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    border-bottom-left-radius: 4px;
+    padding: 1rem 1.2rem;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: bounce 1.2s ease-in-out infinite;
+  }
+
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-6px); opacity: 1; }
+  }
+
+  /* Welcome screen */
+  .welcome {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .welcome h2 {
+    font-size: 1.8rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .welcome p {
+    color: var(--muted);
+    font-size: 0.9rem;
+    max-width: 380px;
+    line-height: 1.6;
+  }
+
+  .quick-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    max-width: 480px;
+  }
+
+  .quick-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.45rem 1rem;
+    font-size: 0.8rem;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'Syne', sans-serif;
+  }
+
+  .quick-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--glow);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">P</div>
+  <div>
+    <h1>PromptCraft</h1>
+    <p>// assistente especialista em engenharia de prompts</p>
+  </div>
+</header>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div>
+      <h2>⚙ Configurar Prompt</h2>
+    </div>
+
+    <div class="field-group">
+      <label>Objetivo do prompt</label>
+      <select id="objetivo">
+        <option value="">Selecione...</option>
+        <option value="criacao_conteudo">✍️ Criação de conteúdo</option>
+        <option value="analise">📊 Análise de dados</option>
+        <option value="resumo">📄 Resumo de documento</option>
+        <option value="brainstorm">💡 Brainstorming</option>
+        <option value="codigo">💻 Programação</option>
+        <option value="email">📧 Redigir e-mail/mensagem</option>
+        <option value="estudo">🎓 Aprendizado/Estudo</option>
+        <option value="negociacao">🤝 Negociação / Roleplay</option>
+      </select>
+    </div>
+
+    <div class="field-group">
+      <label>Técnicas a aplicar</label>
+      <div class="chip-group" id="tecnicas">
+        <button class="chip" data-val="contexto">Contexto rico</button>
+        <button class="chip" data-val="exemplos">Exemplos</button>
+        <button class="chip" data-val="passoApasso">Passo a passo</button>
+        <button class="chip" data-val="papel">Papel/Role</button>
+        <button class="chip" data-val="formato">Formato fixo</button>
+        <button class="chip" data-val="audiencia">Audiência</button>
+        <button class="chip" data-val="kpis">KPIs/Métricas</button>
+        <button class="chip" data-val="citacoes">Citações</button>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label>Tom desejado</label>
+      <div class="chip-group" id="tom">
+        <button class="chip" data-val="formal">Formal</button>
+        <button class="chip" data-val="casual">Casual</button>
+        <button class="chip" data-val="tecnico">Técnico</button>
+        <button class="chip" data-val="didatico">Didático</button>
+        <button class="chip" data-val="persuasivo">Persuasivo</button>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label>Contexto adicional (opcional)</label>
+      <textarea id="contexto" rows="3" placeholder="Ex: sou gerente de produto, minha equipe tem 8 pessoas..."></textarea>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="generate-btn" id="generateBtn" onclick="gerarPrompt()">
+      ✦ Gerar Prompt Otimizado
+    </button>
+  </aside>
+
+  <!-- CHAT -->
+  <div class="chat-area">
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <h2>Crie prompts poderosos</h2>
+        <p>Configure o painel à esquerda e clique em <strong>Gerar Prompt</strong>, ou faça uma pergunta diretamente sobre como criar bons prompts.</p>
+        <div class="quick-chips">
+          <button class="quick-chip" onclick="quickSend('Como usar roleplay para melhorar meus prompts?')">Como usar roleplay?</button>
+          <button class="quick-chip" onclick="quickSend('Qual a diferença entre um prompt ruim e um bom?')">Bom vs. ruim?</button>
+          <button class="quick-chip" onclick="quickSend('Como evitar alucinações do Claude com prompts?')">Evitar alucinações</button>
+          <button class="quick-chip" onclick="quickSend('Me dê um exemplo de prompt para análise financeira')">Prompt financeiro</button>
+          <button class="quick-chip" onclick="quickSend('Como estruturar um prompt para brainstorming?')">Brainstorming</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-bar">
+      <textarea id="userInput" placeholder="Pergunte sobre prompts ou peça ajuda para criar um..." rows="1"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const GUIDE = `Você é o PromptCraft, um especialista em engenharia de prompts para o Claude. Seu papel é ajudar usuários a criar prompts altamente eficazes.
+
+Suas diretrizes:
+1. Seja claro e direto, sem floreios
+2. Use exemplos concretos quando relevante
+3. Explique o PORQUÊ de cada técnica que sugere
+4. Quando criar prompts, entregue o prompt pronto para uso, delimitado entre [PROMPT_INICIO] e [PROMPT_FIM]
+5. Baseie-se nestas técnicas de prompting eficaz:
+   - Ser específico e contextual
+   - Usar exemplos (few-shot)
+   - Solicitar raciocínio passo a passo
+   - Atribuir um papel/persona ao modelo
+   - Definir formato de saída
+   - Especificar audiência e tom
+   - Pedir citações quando relevante
+   - Quebrar tarefas complexas em partes menores
+   - Permitir que Claude admita incerteza
+
+Quando o usuário pedir um prompt gerado, entregue um prompt completo e pronto para uso.
+Responda sempre em português brasileiro.`;
+
+let messages = [];
+let isLoading = false;
+
+// Chip selection
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => chip.classList.toggle('active'));
+});
+
+document.querySelectorAll('#tom .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#tom .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+  });
+});
+
+function getSelectedChips(groupId) {
+  return [...document.querySelectorAll(`#${groupId} .chip.active`)].map(c => c.dataset.val);
+}
+
+function hideWelcome() {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
+}
+
+function appendMessage(role, content) {
+  hideWelcome();
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+
+  const label = document.createElement('div');
+  label.className = 'msg-label';
+  label.textContent = role === 'user' ? '— você' : '— promptcraft';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+
+  // Check for prompt blocks
+  if (role === 'assistant' && content.includes('[PROMPT_INICIO]')) {
+    const parts = content.split(/\[PROMPT_INICIO\]|\[PROMPT_FIM\]/);
+    bubble.textContent = parts[0].trim();
+
+    if (parts[1]) {
+      const resultBox = document.createElement('div');
+      resultBox.className = 'prompt-result';
+      resultBox.textContent = parts[1].trim();
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'copy-btn';
+      copyBtn.textContent = 'copiar';
+      const promptText = parts[1].trim();
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(promptText).then(() => {
+          copyBtn.textContent = '✓ copiado!';
+          copyBtn.classList.add('copied');
+          setTimeout(() => { copyBtn.textContent = 'copiar'; copyBtn.classList.remove('copied'); }, 2000);
+        });
+      };
+      resultBox.appendChild(copyBtn);
+      div.appendChild(label);
+      div.appendChild(bubble);
+      div.appendChild(resultBox);
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+      return;
+    }
+  } else {
+    bubble.textContent = content;
+  }
+
+  div.appendChild(label);
+  div.appendChild(bubble);
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showLoading() {
+  hideWelcome();
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'message assistant';
+  div.id = 'loading-msg';
+  const label = document.createElement('div');
+  label.className = 'msg-label';
+  label.textContent = '— promptcraft';
+  const bubble = document.createElement('div');
+  bubble.className = 'loading-bubble';
+  bubble.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+  div.appendChild(label);
+  div.appendChild(bubble);
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function hideLoading() {
+  const el = document.getElementById('loading-msg');
+  if (el) el.remove();
+}
+
+async function callClaude(userMsg) {
+  messages.push({ role: 'user', content: userMsg });
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      system: GUIDE,
+      messages: messages
+    })
+  });
+
+  const data = await response.json();
+  const reply = data.content?.[0]?.text || 'Erro ao obter resposta.';
+  messages.push({ role: 'assistant', content: reply });
+  return reply;
+}
+
+async function sendMessage(text) {
+  if (isLoading) return;
+  const input = document.getElementById('userInput');
+  const msg = text || input.value.trim();
+  if (!msg) return;
+
+  if (!text) input.value = '';
+  input.style.height = 'auto';
+
+  isLoading = true;
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('generateBtn').disabled = true;
+
+  appendMessage('user', msg);
+  showLoading();
+
+  try {
+    const reply = await callClaude(msg);
+    hideLoading();
+    appendMessage('assistant', reply);
+  } catch (e) {
+    hideLoading();
+    appendMessage('assistant', 'Erro de conexão. Tente novamente.');
+  }
+
+  isLoading = false;
+  document.getElementById('sendBtn').disabled = false;
+  document.getElementById('generateBtn').disabled = false;
+}
+
+async function gerarPrompt() {
+  const objetivo = document.getElementById('objetivo').value;
+  const tecnicas = getSelectedChips('tecnicas');
+  const tom = getSelectedChips('tom')[0] || '';
+  const contexto = document.getElementById('contexto').value.trim();
+
+  if (!objetivo) {
+    alert('Selecione um objetivo para o prompt.');
+    return;
+  }
+
+  const objetivoMap = {
+    criacao_conteudo: 'criação de conteúdo',
+    analise: 'análise de dados',
+    resumo: 'resumo de documento',
+    brainstorm: 'brainstorming de ideias',
+    codigo: 'programação/código',
+    email: 'redigir e-mail ou mensagem',
+    estudo: 'aprendizado e estudo',
+    negociacao: 'negociação com roleplay'
+  };
+
+  let msg = `Crie um prompt otimizado para: **${objetivoMap[objetivo]}**.`;
+  if (tecnicas.length) msg += `\nTécnicas a aplicar: ${tecnicas.join(', ')}.`;
+  if (tom) msg += `\nTom desejado: ${tom}.`;
+  if (contexto) msg += `\nContexto do usuário: ${contexto}.`;
+  msg += '\nEntregue o prompt completo pronto para uso, entre as marcações [PROMPT_INICIO] e [PROMPT_FIM].';
+
+  await sendMessage(msg);
+}
+
+function quickSend(text) {
+  sendMessage(text);
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 130) + 'px';
+}
+</script>
+</body>
+</html>
